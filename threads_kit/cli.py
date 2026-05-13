@@ -85,6 +85,38 @@ def cmd_threads_backup(args: argparse.Namespace) -> None:
         print(f"\n完了！合計 {len(items)} 件を '{args.output}' に保存しました。")
 
 
+def cmd_threads_export_all(args: argparse.Namespace) -> None:
+    """全ページをスロットリング付きで取得し JSON 配列として書き出す。"""
+    client = _client(args)
+    iterator = posts.iter_user_threads(
+        client,
+        user_path=args.user_path,
+        fields=args.fields,
+        page_delay_seconds=args.page_delay,
+        page_delay_jitter=args.page_jitter,
+        max_retries_per_page=args.max_retries,
+        backoff_initial=args.backoff_initial,
+        backoff_max=args.backoff_max,
+    )
+    try:
+        n = posts.export_threads_json_array_stream(
+            args.output,
+            iterator,
+            pretty=args.pretty,
+            quiet=args.quiet,
+            progress_every=args.progress_every,
+        )
+    except ThreadsAPIError as e:
+        print(f"API エラー: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    if not args.quiet:
+        if args.output == "-":
+            print(f"\n完了。合計 {n} 件を標準出力に書き出しました。", file=sys.stderr)
+        else:
+            print(f"\n完了。合計 {n} 件を '{args.output}' に書き出しました。", file=sys.stderr)
+
+
 def cmd_thread_get(args: argparse.Namespace) -> None:
     client = _client(args)
     data = posts.get_thread(client, args.thread_id, fields=args.fields)
@@ -281,6 +313,70 @@ def build_parser() -> argparse.ArgumentParser:
     p_backup.add_argument("--pretty", action="store_true", help="JSON をインデント付きで保存")
     p_backup.add_argument("--quiet", "-q", action="store_true", help="進捗ログを出さない")
     p_backup.set_defaults(func=cmd_threads_backup)
+
+    p_ex = sub.add_parser(
+        "threads-export-all",
+        help="指定ユーザーの全期間スレッドを JSON 配列で取得（ページ間ウェイト・再試行あり）",
+    )
+    p_ex.add_argument(
+        "--output",
+        "-o",
+        default="threads_all_export.json",
+        help="出力先（'-' で標準出力。大量時はメモリに載る点に注意）",
+    )
+    p_ex.add_argument(
+        "--fields",
+        default=posts.DEFAULT_THREAD_FIELDS,
+        help="取得フィールド（カンマ区切り）",
+    )
+    p_ex.add_argument(
+        "--page-delay",
+        type=float,
+        default=0.35,
+        metavar="SEC",
+        help="2 ページ目以降のリクエスト間隔の基準秒（ジッタが加算される）",
+    )
+    p_ex.add_argument(
+        "--page-jitter",
+        type=float,
+        default=0.25,
+        metavar="SEC",
+        help="ページ間隔に加えるランダムジッタの上限秒",
+    )
+    p_ex.add_argument(
+        "--max-retries",
+        type=int,
+        default=12,
+        help="同一ページ取得の最大再試行回数（429 / 5xx / レート系 Graph エラー時）",
+    )
+    p_ex.add_argument(
+        "--backoff-initial",
+        type=float,
+        default=2.0,
+        metavar="SEC",
+        help="再試行の指数バックオフの初期秒",
+    )
+    p_ex.add_argument(
+        "--backoff-max",
+        type=float,
+        default=120.0,
+        metavar="SEC",
+        help="再試行待機の上限秒",
+    )
+    p_ex.add_argument(
+        "--progress-every",
+        type=int,
+        default=25,
+        metavar="N",
+        help="N 件ごとに標準エラーへ進捗を表示（0 で無効）",
+    )
+    p_ex.add_argument(
+        "--pretty",
+        action="store_true",
+        help="整形 JSON（ファイル出力時は全文をメモリに載せます）",
+    )
+    p_ex.add_argument("--quiet", "-q", action="store_true", help="完了メッセージも抑止")
+    p_ex.set_defaults(func=cmd_threads_export_all)
 
     p_one = sub.add_parser("thread", help="単一スレッド GET /{id}")
     p_one.add_argument("thread_id", help="スレッド（メディア）ID")
