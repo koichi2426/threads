@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "threads-kit"
+version = "0.1.0"
+description = "Threads Graph API の基本操作キット（CLI + 薄い Python クライアント）"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.28",
+    "python-dotenv>=1.0",
+]
+
+[project.scripts]
+threads-kit = "threads_kit.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["threads_kit*"]

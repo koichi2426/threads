@@ -1,0 +1,23 @@
+# ローカル用（.env にリネームして利用）
+.env
+.env.*
+!.env.example
+!.envrc.example
+
+# direnv
+.envrc
+
+# バックアップ出力
+threads_backup.json
+
+# Python
+__pycache__/
+*.py[cod]
+.Python
+.venv/
+venv/
+
+# ビルド
+build/
+dist/
+*.egg-info/
